@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RECSA — Costo Financiero Inventario</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0e1a;--s1:#111827;--s2:#1a2235;--bd:#2a3450;--tx:#e8ecf4;--t2:#8899b4;--ac:#4f8cff;--gn:#00d4aa;--rd:#ff4d6a;--or:#ffb84d;--pu:#a78bfa}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+.header{background:linear-gradient(135deg,#0d1117,#1a2235);border-bottom:1px solid var(--bd);padding:16px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.header h1{font-size:18px;font-weight:700}.header h1 span{color:var(--ac)}
+.btn-sm{padding:6px 14px;border-radius:6px;border:1px solid var(--bd);background:var(--s2);color:var(--tx);font-family:"DM Sans";font-size:12px;cursor:pointer}
+.btn-sm:hover{border-color:var(--ac);color:var(--ac)}
+.btn-load{padding:6px 14px;border-radius:6px;border:1px solid var(--ac);background:rgba(79,140,255,.1);color:var(--ac);font-family:"DM Sans";font-size:12px;font-weight:600;cursor:pointer}
+.btn-load:hover{background:var(--ac);color:#fff}
+.kpi-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:12px 24px;background:var(--s1);border-bottom:1px solid var(--bd)}
+.kpi{text-align:center}.kpi .lb{font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:1px}.kpi .vl{font-family:"JetBrains Mono";font-size:16px;font-weight:600;margin-top:2px}
+.main{display:grid;grid-template-columns:1fr 300px;min-height:calc(100vh - 130px)}
+.tbl-section{padding:16px;overflow:auto}
+.sidebar{background:var(--s1);border-left:1px solid var(--bd);padding:16px;overflow-y:auto}
+.sidebar h3{font-size:13px;margin-bottom:12px;color:var(--or)}
+.card{background:var(--s2);border-radius:8px;padding:14px;margin-bottom:10px;border:1px solid var(--bd)}
+.card h4{font-size:11px;color:var(--t2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.sr{display:flex;justify-content:space-between;padding:3px 0;font-size:12px}.sr .lb{color:var(--t2)}.sr .vl{font-family:"JetBrains Mono";font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:var(--s2);color:var(--t2);font-weight:600;padding:8px;text-align:left;position:sticky;top:0;z-index:2;border-bottom:2px solid var(--bd);font-size:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+tbody td{padding:5px 8px;border-bottom:1px solid rgba(42,52,80,.4);vertical-align:middle}
+tbody tr:hover{background:rgba(79,140,255,.04)}
+.mono{font-family:"JetBrains Mono";font-size:11px}
+input[type=range]{width:70px;height:4px;-webkit-appearance:none;background:var(--bd);border-radius:2px;outline:none;cursor:pointer;vertical-align:middle}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:var(--ac);border-radius:50%;cursor:pointer}
+.pv{font-family:"JetBrains Mono";font-size:10px;color:var(--ac);min-width:28px;display:inline-block;text-align:right}
+.gc{padding:12px 24px;background:var(--s2);border-bottom:1px solid var(--bd);display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+.gc label{font-size:12px;color:var(--t2)}
+.gc input[type=number]{width:80px;background:var(--s1);border:1px solid var(--bd);color:var(--ac);padding:4px 8px;border-radius:4px;font-family:"JetBrains Mono";font-size:12px;text-align:right}
+.filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.filters select,.filters input{background:var(--s2);border:1px solid var(--bd);color:var(--tx);padding:6px 10px;border-radius:6px;font-family:"DM Sans";font-size:12px}
+.filters input{flex:1;min-width:120px}
+</style>
+</head>
+<body>
+<div class="header">
+  <div><h1>Costo Financiero <span>Inventario</span> — RECSA</h1><div style="color:var(--t2);font-size:11px;margin-top:2px">Cálculo de costo financiero por producto basado en stock standard · <span id="dataSource" style="color:var(--ac)">Datos base</span></div></div>
+  <div style="display:flex;gap:8px">
+    <label class="btn-load" onclick="document.getElementById('fileIn').click()">📂 Cargar Excel</label>
+    <input type="file" id="fileIn" accept=".xlsx,.xls" style="display:none" onchange="loadExcel(this.files[0])">
+    <button class="btn-sm" onclick="exportCSV()">📥 CSV</button>
+    <button class="btn-sm" onclick="location.reload()">🔄</button>
+  </div>
+</div>
+<div class="gc">
+  <div style="display:flex;align-items:center;gap:8px"><label>TNA Referencia:</label><input type="range" min="5" max="80" value="35" id="gTNA" oninput="updateG()" style="width:120px"><span class="mono" id="gTNAv" style="color:var(--or)">35.0%</span></div>
+  <div style="display:flex;align-items:center;gap:8px"><label>TC USD/ARS:</label><input type="number" value="1490" id="gTC" onchange="updateG()"></div>
+  <div style="display:flex;align-items:center;gap:8px"><label>Vol Mensual (kg):</label><input type="number" value="29379" id="gVol" onchange="updateG()"></div>
+</div>
+<div class="kpi-bar" id="kpis"></div>
+<div class="main">
+  <div class="tbl-section">
+    <div class="filters">
+      <select id="fLine" onchange="renderAll()"><option value="ALL">Todas las líneas</option></select>
+      <input type="text" id="fSearch" placeholder="Buscar producto..." oninput="renderAll()">
+    </div>
+    <div id="tbl" style="max-height:calc(100vh - 280px);overflow-y:auto"></div>
+  </div>
+  <div class="sidebar" id="sb"></div>
+</div>
+<script>
+var S = [{"p":"RECSASEAL EL 125 A/B conformado X 20/4","l":"RECSASEAL","o":"BR/LOCAL","v":6048.0,"lt":30,"ss":15,"d":2.943631},{"p":"RECSASEAL EL 125 A/B conformado X 200/20","l":"RECSASEAL","o":"BR/LOCAL","v":1447.0,"lt":30,"ss":15,"d":3.16},{"p":"RECSASEAL EL 145 A/B conformado x 20","l":"RECSASEAL","o":"BR/LOCAL","v":5856.0,"lt":30,"ss":15,"d":3.82},{"p":"RECSASEAL EL 145 A/B conformado 1000x200","l":"RECSASEAL","o":"BR/LOCAL","v":2661.0,"lt":30,"ss":15,"d":2.67},{"p":"RECSASEAL  EL220 100/10 cte A x 20","l":"RECSASEAL","o":"BR/LOCAL","v":5940.0,"lt":30,"ss":15,"d":2.46},{"p":"RECSASEAL  EL220 100/10 cte B x 20","l":"RECSASEAL","o":"BR/LOCAL","v":5940.0,"lt":30,"ss":15,"d":2.93},{"p":"RECSASEAL S164W","l":"RECSASEAL","o":"BR/LOCAL","v":1140.0,"lt":30,"ss":15,"d":6.63},{"p":"CATALIZADOR 3320","l":"RECSASEAL","o":"BR/LOCAL","v":88.0,"lt":30,"ss":15,"d":3.09},{"p":"R 172 X 20","l":"RECSAPREN","o":"BR/LOCAL","v":400.0,"lt":30,"ss":15,"d":3.0},{"p":"R 172 X 200","l":"RECSAPREN","o":"BR/LOCAL","v":1800.0,"lt":30,"ss":15,"d":3.11},{"p":"R 178 X 20","l":"RECSAPREN","o":"BR/LOCAL","v":2480.0,"lt":30,"ss":15,"d":6.89},{"p":"R75D60 x 20","l":"RECSAPREN","o":"BR/LOCAL","v":80.0,"lt":30,"ss":15,"d":3.12},{"p":"R 190","l":"RECSAPREN","o":"BR/LOCAL","v":100.0,"lt":30,"ss":15,"d":3.19},{"p":"R2140 x 20","l":"RECSAPREN","o":"BR/LOCAL","v":860.0,"lt":30,"ss":15,"d":3.17},{"p":"R 250","l":"RECSAPREN","o":"BR/LOCAL","v":180.0,"lt":30,"ss":15,"d":3.19},{"p":"R 360","l":"RECSAPREN","o":"BR/LOCAL","v":40.0,"lt":30,"ss":15,"d":3.19},{"p":"R 280","l":"RECSAPREN","o":"BR/LOCAL","v":280.0,"lt":30,"ss":15,"d":8.45},{"p":"R8060","l":"RECSAPREN","o":"BR/LOCAL","v":40.0,"lt":30,"ss":15,"d":8.0},{"p":"R9260","l":"RECSAPREN","o":"BR/LOCAL","v":160.0,"lt":30,"ss":15,"d":7.99},{"p":"R9560","l":"RECSAPREN","o":"BR/LOCAL","v":480.0,"lt":30,"ss":15,"d":7.87},{"p":"R491","l":"RECSAPREN","o":"BR/LOCAL","v":400.0,"lt":30,"ss":15,"d":2.55},{"p":"FLEX 85 ROJO","l":"RECSAPREN","o":"BR/LOCAL","v":980.0,"lt":30,"ss":15,"d":3.49},{"p":"UVG300 A","l":"RECSABOND UVG","o":"BR/LOCAL","v":1040.0,"lt":35,"ss":20,"d":3.42},{"p":"UVG300 B","l":"RECSABOND UVG","o":"BR/LOCAL","v":832.0,"lt":35,"ss":20,"d":2.25},{"p":"AG10 X 200","l":"RECSABOND","o":"BR/LOCAL","v":2800.0,"lt":35,"ss":20,"d":2.44},{"p":"AG30 X 200","l":"RECSABOND","o":"BR/LOCAL","v":12820.0,"lt":35,"ss":20,"d":2.78},{"p":"AG50 formula con ppg1000 X 200","l":"RECSABOND","o":"BR/LOCAL","v":49800.0,"lt":35,"ss":20,"d":2.74},{"p":"AG50 formula con ppg3000 X 200","l":"RECSABOND","o":"BR/LOCAL","v":49800.0,"lt":35,"ss":20,"d":3.25},{"p":"AG50 formula shiso (solo reetiquetado)","l":"RECSABOND","o":"BR/LOCAL","v":79200.0,"lt":35,"ss":20,"d":2.44},{"p":"AG50 - 30 BONGO","l":"RECSABOND","o":"BR/LOCAL","v":30000.0,"lt":35,"ss":20,"d":2.93},{"p":"HP X 20","l":"RECSABOND","o":"BR/LOCAL","v":3700.0,"lt":35,"ss":20,"d":2.99},{"p":"HP X 200","l":"RECSABOND","o":"BR/LOCAL","v":3700.0,"lt":35,"ss":20,"d":2.85},{"p":"RF7  x 10","l":"RECSABOND","o":"BR/LOCAL","v":11710.0,"lt":35,"ss":20,"d":2.71},{"p":"RF7 alt2 x 1","l":"RECSABOND","o":"BR/LOCAL","v":300.0,"lt":35,"ss":20,"d":2.88},{"p":"RF7 alt2 x 10","l":"RECSABOND","o":"BR/LOCAL","v":100.0,"lt":35,"ss":20,"d":2.72},{"p":"RF7 alt2 x 15","l":"RECSABOND","o":"BR/LOCAL","v":100.0,"lt":35,"ss":20,"d":2.54},{"p":"RF7 alt2 x 200","l":"RECSABOND","o":"BR/LOCAL","v":100.0,"lt":35,"ss":20,"d":2.62},{"p":"ML723 20","l":"RECSABOND ML","o":"BR/LOCAL","v":860.0,"lt":35,"ss":20,"d":3.03},{"p":"ML723 200","l":"RECSABOND ML","o":"BR/LOCAL","v":400.0,"lt":35,"ss":20,"d":2.94},{"p":"ML 495 20","l":"RECSABOND ML","o":"BR/LOCAL","v":600.0,"lt":35,"ss":20,"d":2.35},{"p":"ML 495 200","l":"RECSABOND ML","o":"BR/LOCAL","v":400.0,"lt":35,"ss":20,"d":2.44},{"p":"ML 810 x 20","l":"RECSABOND ML","o":"BR/LOCAL","v":200.0,"lt":35,"ss":20,"d":0.0},{"p":"ML 810 x 200","l":"RECSABOND ML","o":"BR/LOCAL","v":2400.0,"lt":35,"ss":20,"d":0.0},{"p":"ML 630 x 20","l":"RECSABOND ML","o":"BR/LOCAL","v":1.0,"lt":35,"ss":20,"d":15.95},{"p":"ML630 x 200","l":"RECSABOND ML","o":"BR/LOCAL","v":1.0,"lt":35,"ss":20,"d":6.89},{"p":"E300","l":"REVENTA","o":"IMPORT","v":100.0,"lt":50,"ss":30,"d":3.15},{"p":"MOCA","l":"REVENTA","o":"IMPORT","v":400.0,"lt":50,"ss":30,"d":3.33},{"p":"RC 51 A A/B","l":"RECSACOAT","o":"BR/LOCAL","v":400.0,"lt":30,"ss":15,"d":6.35},{"p":"WRC GRIS ULTIMA MOD 0623","l":"RECSACOAT","o":"BR/LOCAL","v":2400.0,"lt":30,"ss":15,"d":54.0},{"p":"Catalizador UVG 15","l":"RECSABOND UVG","o":"BR/LOCAL","v":50.0,"lt":35,"ss":20,"d":1.85},{"p":"Desmoldante 2035","l":"RECSAPREN","o":"BR/LOCAL","v":100.0,"lt":30,"ss":15,"d":1.85},{"p":"Diluyente DCM 20","l":"REVENTA","o":"IMPORT","v":100.0,"lt":50,"ss":30,"d":2.85},{"p":"Diluyente DCM 200","l":"REVENTA","o":"IMPORT","v":200.0,"lt":50,"ss":30,"d":5.22},{"p":"MDI Polimerico","l":"MATERIA PRIMA","o":"IMPORT","v":200.0,"lt":50,"ss":30,"d":8.52},{"p":"Pasta Pigmentada Negra","l":"MATERIA PRIMA","o":"IMPORT","v":10.0,"lt":50,"ss":30,"d":2.27},{"p":"Pasta Pigmentada Roja","l":"MATERIA PRIMA","o":"IMPORT","v":10.0,"lt":50,"ss":30,"d":0.0},{"p":"Plastificante D","l":"REVENTA","o":"IMPORT","v":10.0,"lt":50,"ss":30,"d":2.99},{"p":"QX50I - QUIMECO","l":"FAZON","o":"LOCAL","v":23173.0,"lt":25,"ss":15,"d":3.06},{"p":"RECSABOND LN 40 AV","l":"RECSABOND","o":"BR/LOCAL","v":300.0,"lt":35,"ss":20,"d":5.9},{"p":"RECSABOND Primer","l":"RECSABOND","o":"BR/LOCAL","v":3840.0,"lt":35,"ss":20,"d":9.45},{"p":"Recsacoat TX","l":"REVENTA","o":"IMPORT","v":500.0,"lt":50,"ss":30,"d":16.57},{"p":"RECSADIL UVG 90","l":"RECSABOND UVG","o":"BR/LOCAL","v":20.0,"lt":35,"ss":20,"d":2.57},{"p":"RETIFLEX","l":"RECSAPREN","o":"BR/LOCAL","v":104.0,"lt":30,"ss":15,"d":0},{"p":"RECSABOND SG114","l":"RECSABOND","o":"BR/LOCAL","v":3000.0,"lt":35,"ss":20,"d":0},{"p":"AMARILLO X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"VIOLETA X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"GRIS X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"ROJO CLARO X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"ROJO X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"ROJO OXIDO X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"ROSA X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"VERDE X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"VERDE CLARO X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"AZUL X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"CELESTE X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"NARANJA X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"NARANJA CLARO X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"GRIS CLARO X 25","l":"RECSACROM","o":"LOCAL","v":600.0,"lt":15,"ss":10,"d":0},{"p":"78","l":"","o":"LOCAL","v":331581.0,"lt":25,"ss":15,"d":0}];
+
+function gTNA(){return parseFloat(document.getElementById("gTNA").value)/100}
+function gTC(){return parseFloat(document.getElementById("gTC").value)||1490}
+function gVol(){return parseFloat(document.getElementById("gVol").value)||29379}
+
+function ci(s){
+  var sd=s.lt+s.ss;
+  var sk=s.v>0?(s.v/365)*sd:0;
+  var su=sk*s.d;
+  var t=gTNA();
+  var cfd=s.v>0?(su*t)/(s.v*365):0;
+  var cfs=cfd*sd;
+  var cfp=s.d>0?cfs/s.d:0;
+  var cfa=cfs*s.v;
+  return {sd:sd,sk:sk,su:su,cfd:cfd,cfs:cfs,cfp:cfp,cfa:cfa};
+}
+
+function fmt(n){return Math.abs(n).toLocaleString("es-AR",{maximumFractionDigits:0})}
+function fd(n){return n.toFixed(2)}
+function fd4(n){return n.toFixed(4)}
+
+function updateG(){
+  document.getElementById("gTNAv").textContent=(gTNA()*100).toFixed(1)+"%";
+  renderAll();
+}
+
+function ui(idx,f,val){S[idx][f]=parseInt(val);renderAll();}
+function uv(idx,val){S[idx].v=parseFloat(val)||0;renderAll();}
+
+function initFilters(){
+  var lines={};for(var i=0;i<S.length;i++)lines[S[i].l]=1;
+  var sel=document.getElementById("fLine");
+  Object.keys(lines).sort().forEach(function(l){if(l){var o=document.createElement("option");o.value=l;o.textContent=l;sel.appendChild(o);}});
+}
+
+function getFiltered(){
+  var fl=document.getElementById("fLine").value;
+  var fs=document.getElementById("fSearch").value.toLowerCase();
+  var r=[];
+  for(var i=0;i<S.length;i++){
+    var s=S[i];
+    if(fl!=="ALL"&&s.l!==fl)continue;
+    if(fs&&(s.p+s.l).toLowerCase().indexOf(fs)<0)continue;
+    r.push({s:s,i:i});
+  }
+  return r;
+}
+
+function renderAll(){renderKPIs();renderTable();renderSB();}
+
+function renderKPIs(){
+  var tsu=0,tcf=0,tv=0,nc=0;
+  for(var i=0;i<S.length;i++){var c=ci(S[i]);tsu+=c.su;tcf+=c.cfa;tv+=S[i].v;if(c.sk>0)nc++;}
+  var cpk=tv>0?tcf/tv:0;
+  var cma=(tcf/12)*gTC();
+  var h="";
+  h+='<div class="kpi"><div class="lb">Stock Inmovilizado</div><div class="vl" style="color:var(--or)">USD '+fmt(tsu)+'</div></div>';
+  h+='<div class="kpi"><div class="lb">CF Anual</div><div class="vl" style="color:var(--rd)">USD '+fmt(tcf)+'</div></div>';
+  h+='<div class="kpi"><div class="lb">CF Promedio USD/kg</div><div class="vl" style="color:var(--rd)">USD '+fd(cpk)+'</div></div>';
+  h+='<div class="kpi"><div class="lb">CF Mensual ARS</div><div class="vl" style="color:var(--rd)">ARS '+fmt(cma)+'</div></div>';
+  h+='<div class="kpi"><div class="lb">Con Stock</div><div class="vl">'+nc+' / '+S.length+'</div></div>';
+  document.getElementById("kpis").innerHTML=h;
+}
+
+function renderTable(){
+  var items=getFiltered();
+  var h='<table><thead><tr><th>Línea</th><th>Producto</th><th>Origen</th><th style="text-align:right">Vol Anual</th><th>Lead Time</th><th>Stock Seg</th><th>Std (días)</th><th style="text-align:right">Stock kg</th><th style="text-align:right">MP USD</th><th style="text-align:right">Stock USD</th><th style="text-align:right">CF/kg</th><th>%MP</th><th style="text-align:right">CF Anual</th></tr></thead><tbody>';
+  for(var j=0;j<items.length;j++){
+    var s=items[j].s,i=items[j].i,c=ci(s);
+    var cc=c.cfs>1?"var(--rd)":c.cfs>0.5?"var(--or)":"var(--gn)";
+    h+="<tr>";
+    h+='<td style="font-size:10px;color:var(--t2)">'+s.l+'</td>';
+    h+='<td style="font-weight:500">'+s.p+'</td>';
+    h+='<td style="font-size:10px;color:var(--t2)">'+s.o+'</td>';
+    h+='<td><input type="number" value="'+s.v+'" onchange="uv('+i+',this.value)" style="width:70px;background:var(--s1);border:1px solid var(--bd);color:var(--ac);padding:2px 6px;border-radius:4px;font-family:JetBrains Mono;font-size:11px;text-align:right"></td>';
+    h+='<td><input type="range" min="0" max="120" value="'+s.lt+'" oninput="ui('+i+',\'lt\',this.value)"><span class="pv">'+s.lt+'d</span></td>';
+    h+='<td><input type="range" min="0" max="90" value="'+s.ss+'" oninput="ui('+i+',\'ss\',this.value)"><span class="pv">'+s.ss+'d</span></td>';
+    h+='<td class="mono" style="text-align:center">'+c.sd+'</td>';
+    h+='<td class="mono" style="text-align:right">'+fmt(c.sk)+'</td>';
+    h+='<td class="mono" style="text-align:right">'+fd(s.d)+'</td>';
+    h+='<td class="mono" style="text-align:right;color:var(--or)">'+fmt(c.su)+'</td>';
+    h+='<td class="mono" style="text-align:right;color:'+cc+'">'+fd(c.cfs)+'</td>';
+    h+='<td class="mono" style="color:'+cc+'">'+(c.cfp*100).toFixed(1)+'%</td>';
+    h+='<td class="mono" style="text-align:right;color:var(--rd)">'+fmt(c.cfa)+'</td>';
+    h+="</tr>";
+  }
+  h+="</tbody></table>";
+  document.getElementById("tbl").innerHTML=h;
+}
+
+function renderSB(){
+  var bo={},bl={},top=[];
+  for(var i=0;i<S.length;i++){var s=S[i],c=ci(s);
+    var o=s.o||"N/A";if(!bo[o])bo[o]={su:0,cf:0,n:0};bo[o].su+=c.su;bo[o].cf+=c.cfa;bo[o].n++;
+    var l=s.l||"OTROS";if(!bl[l])bl[l]={su:0,cf:0,n:0};bl[l].su+=c.su;bl[l].cf+=c.cfa;bl[l].n++;
+    if(c.cfa>0)top.push({p:s.p,cf:c.cfa,ck:c.cfs});}
+  top.sort(function(a,b){return b.cf-a.cf});
+
+  var h='<h3>Resumen</h3>';
+  h+='<div class="card"><h4>Por Línea</h4>';
+  var lks=Object.keys(bl).sort(function(a,b){return bl[b].su-bl[a].su});
+  for(var i=0;i<lks.length;i++){var k=lks[i],d=bl[k];h+='<div class="sr"><span class="lb">'+k+' ('+d.n+')</span><span class="vl" style="color:var(--or)">USD '+fmt(d.su)+'</span></div>';}
+  h+='</div>';
+  
+  h+='<div class="card"><h4>Por Origen</h4>';
+  var oks=Object.keys(bo).sort(function(a,b){return bo[b].su-bo[a].su});
+  for(var i=0;i<oks.length;i++){var k=oks[i],d=bo[k];h+='<div class="sr"><span class="lb">'+k+' ('+d.n+')</span><span class="vl" style="color:var(--or)">USD '+fmt(d.su)+'</span></div>';}
+  h+='</div>';
+
+  h+='<div class="card"><h4>Top Costo Financiero</h4>';
+  for(var i=0;i<Math.min(top.length,8);i++){var p=top[i];h+='<div class="sr"><span class="lb" style="font-size:11px">'+p.p.substring(0,25)+'</span><span class="vl" style="color:var(--rd);font-size:11px">'+fmt(p.cf)+' ('+fd(p.ck)+'/kg)</span></div>';}
+  h+='</div>';
+
+  h+='<div class="card"><h4>Fórmulas</h4><div style="font-size:10px;color:var(--t2);line-height:1.6">Stock Std = LT + SS<br>Stock kg = (Vol/365) × Std<br>Stock USD = kg × MP<br>CF Diario = (Stock USD × TNA) / (Vol × 365)<br>CF/kg = Diario × Std días<br>CF Anual = CF/kg × Vol</div></div>';
+  
+  h+='<button class="btn-sm" style="width:100%;margin-top:12px;padding:10px;background:var(--ac);color:#fff;border:none;font-weight:600" onclick="exportCSV()">📥 Export CSV</button>';
+  document.getElementById("sb").innerHTML=h;
+}
+
+function loadExcel(file){
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(e.target.result,{type:'array'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:0,raw:true});
+      if(rows.length<2)throw new Error("Vacío");
+      var hdrs=rows[0].map(function(h){return String(h||"").toLowerCase().trim()});
+      var cm={};
+      hdrs.forEach(function(h,i){
+        if(h.includes("línea")||h.includes("linea"))cm.l=i;
+        else if(h.includes("producto"))cm.p=i;
+        else if(h.includes("origen"))cm.o=i;
+        else if(h.includes("vol"))cm.v=i;
+        else if(h.includes("lead"))cm.lt=i;
+        else if(h.includes("stock seg")||h.includes("seguridad"))cm.ss=i;
+        else if(h.includes("mp")||h.includes("ddp")||h.includes("costo"))cm.d=i;
+      });
+      var newS=[];
+      for(var r=1;r<rows.length;r++){
+        var row=rows[r];var prod=String(row[cm.p]||"").trim();if(!prod)continue;
+        var pf=function(v){var n=parseFloat(v);return isNaN(n)?0:Math.abs(n)};
+        newS.push({p:prod,l:cm.l!==undefined?String(row[cm.l]||"").trim():"",o:cm.o!==undefined?String(row[cm.o]||"").trim():"LOCAL",v:pf(row[cm.v]),lt:cm.lt!==undefined?Math.round(pf(row[cm.lt])):30,ss:cm.ss!==undefined?Math.round(pf(row[cm.ss])):15,d:pf(row[cm.d])});
+      }
+      if(newS.length>0){S=newS;document.getElementById("dataSource").textContent="Excel: "+file.name+" ("+newS.length+")";document.getElementById("dataSource").style.color="var(--gn)";initFilters();renderAll();}
+    }catch(err){alert("Error: "+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function exportCSV(){
+  var csv="Línea,Producto,Origen,Vol Anual,Lead Time,Stock Seg,Std Días,Stock Kg,MP USD,Stock USD,TNA,CF/kg,% MP,CF Anual\n";
+  for(var i=0;i<S.length;i++){var s=S[i],c=ci(s);csv+='"'+s.l+'","'+s.p+'","'+s.o+'",'+s.v+','+s.lt+','+s.ss+','+c.sd+','+c.sk.toFixed(1)+','+s.d.toFixed(2)+','+c.su.toFixed(0)+','+(gTNA()*100).toFixed(1)+','+c.cfs.toFixed(4)+','+(c.cfp*100).toFixed(1)+','+c.cfa.toFixed(0)+"\n";}
+  var b=new Blob([csv],{type:"text/csv"});var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="RECSA_inventario_cf_"+new Date().toISOString().slice(0,10)+".csv";a.click();
+}
+
+initFilters();
+renderAll();
+</script>
+</body>
+</html>
